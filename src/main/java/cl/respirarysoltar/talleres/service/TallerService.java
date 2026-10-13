@@ -99,12 +99,12 @@ public class TallerService {
         if (restante != null && restante >= 0) {
             taller.setCupoDisponible(restante.intValue());
             tallerRepository.save(taller);
-            return inscripcionRepository.save(new Inscripcion(request.pacienteId(), EstadoInscripcion.CONFIRMADA));
+            return guardarInscripcion(taller, request.pacienteId(), EstadoInscripcion.CONFIRMADA);
         }
 
         // Cupo agotado: se revierte el decremento y el paciente queda en lista de espera.
         redisTemplate.opsForValue().increment(claveCupo(tallerId));
-        return inscripcionRepository.save(new Inscripcion(request.pacienteId(), EstadoInscripcion.EN_ESPERA));
+        return guardarInscripcion(taller, request.pacienteId(), EstadoInscripcion.EN_ESPERA);
     }
 
     @Transactional(readOnly = true)
@@ -137,6 +137,12 @@ public class TallerService {
     /** Crea la clave de cupo en Redis la primera vez, tomando el valor desde la base de datos. */
     private void inicializarCupo(Taller taller) {
         redisTemplate.opsForValue().setIfAbsent(claveCupo(taller.getId()), String.valueOf(taller.getCupoDisponible()));
+    }
+
+    private Inscripcion guardarInscripcion(Taller taller, UUID pacienteId, EstadoInscripcion estado) {
+        Inscripcion inscripcion = new Inscripcion(pacienteId, estado);
+        inscripcion.setTaller(taller);
+        return inscripcionRepository.save(inscripcion);
     }
 
     private String claveCupo(UUID tallerId) {
